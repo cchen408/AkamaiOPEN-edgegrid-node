@@ -19,7 +19,7 @@ var request = require('request'),
   helpers = require('./helpers'),
   logger = require('./logger');
 
-var EdgeGrid = function(client_token, client_secret, access_token, host, debug) {
+var EdgeGrid = function (client_token, client_secret, access_token, host, debug, proxy) {
   // accepting an object containing a path to .edgerc and a config section
   request.debug = process.env.EG_VERBOSE || false;
   if (typeof arguments[0] === 'object') {
@@ -27,7 +27,7 @@ var EdgeGrid = function(client_token, client_secret, access_token, host, debug) 
     this._setConfigFromObj(arguments[0]);
   } else {
     request.debug = request.debug || debug ? true : false;
-    this._setConfigFromStrings(client_token, client_secret, access_token, host);
+    this._setConfigFromStrings(client_token, client_secret, access_token, host, proxy);
   }
 };
 
@@ -39,7 +39,7 @@ var EdgeGrid = function(client_token, client_secret, access_token, host, debug) 
  *                      that will be included in the signature. This will be
  *                      provided by specific APIs.
  */
-EdgeGrid.prototype.auth = function(req) {
+EdgeGrid.prototype.auth = function (req) {
   req = helpers.extend(req, {
     url: this.config.host + req.path,
     method: 'GET',
@@ -67,9 +67,14 @@ EdgeGrid.prototype.auth = function(req) {
   return this;
 };
 
-EdgeGrid.prototype.send = function(callback) {
-  request(this.request, function(error, response, body) { 
-    
+EdgeGrid.prototype.send = function (callback) {
+  if (this.config.proxy) {
+    console.log('add proxy');
+    this.request.proxy = this.config.proxy;
+  }
+
+  request(this.request, function (error, response, body) {
+
     if (error) {
       callback(error);
       return;
@@ -85,7 +90,7 @@ EdgeGrid.prototype.send = function(callback) {
   return this;
 };
 
-EdgeGrid.prototype._handleRedirect = function(resp, callback) {
+EdgeGrid.prototype._handleRedirect = function (resp, callback) {
   var parsedUrl = url.parse(resp.headers['location']);
 
   resp.headers['authorization'] = undefined;
@@ -103,8 +108,9 @@ EdgeGrid.prototype._handleRedirect = function(resp, callback) {
  * @param {String} client_secret   The client secret
  * @param {String} access_token    The access token
  * @param {String} host            The host
+ * @param {String} proxy           The proxy
  */
-EdgeGrid.prototype._setConfigFromStrings = function(client_token, client_secret, access_token, host) {
+EdgeGrid.prototype._setConfigFromStrings = function (client_token, client_secret, access_token, host, proxy) {
   if (!validatedArgs([client_token, client_secret, access_token, host])) {
     throw new Error('Insufficient Akamai credentials');
   }
@@ -113,7 +119,8 @@ EdgeGrid.prototype._setConfigFromStrings = function(client_token, client_secret,
     client_token: client_token,
     client_secret: client_secret,
     access_token: access_token,
-    host: host.indexOf('https://') > -1 ? host : 'https://' + host
+    host: host.indexOf('https://') > -1 ? host : 'https://' + host,
+    proxy: proxy
   };
 };
 
@@ -123,7 +130,7 @@ function validatedArgs(args) {
     ],
     valid = true;
 
-  expected.forEach(function(arg, i) {
+  expected.forEach(function (arg, i) {
     if (!args[i]) {
       if (process.env.EDGEGRID_ENV !== 'test') {
         logger.error('No defined ' + arg);
@@ -142,7 +149,7 @@ function validatedArgs(args) {
  * @param {Object} obj  An Object containing a path and section property that
  *                      define the .edgerc section to use to create the Object.
  */
-EdgeGrid.prototype._setConfigFromObj = function(obj) {
+EdgeGrid.prototype._setConfigFromObj = function (obj) {
   this.config = edgerc(obj.path, obj.section);
 };
 
