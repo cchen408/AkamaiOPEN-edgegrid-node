@@ -69,10 +69,9 @@ EdgeGrid.prototype.auth = function (req) {
 
 EdgeGrid.prototype.send = function (callback) {
   if (this.config.proxy) {
-    console.log('add proxy');
     this.request.proxy = this.config.proxy;
+    this.request.tunnel = true;
   }
-
   request(this.request, function (error, response, body) {
 
     if (error) {
